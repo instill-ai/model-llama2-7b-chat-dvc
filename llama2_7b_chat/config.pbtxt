@@ -1,4 +1,4 @@
-name: "llama2_13b_chat"
+name: "llama2_7b_chat"
 backend: "python"
 
 # Disabling batching in Triton, let vLLM handle the batching on its own.
