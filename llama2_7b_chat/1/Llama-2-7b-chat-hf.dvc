@@ -1,5 +1,6 @@
 outs:
-- md5: d60b7131e94aca3a6669904592b99b4b.dir
-  size: 26956245304
-  nfiles: 16
+- md5: 00d48f320cafc2cb40ec8d04da3391e0.dir
+  size: 13479271476
+  nfiles: 10
+  hash: md5
   path: Llama-2-7b-chat-hf
