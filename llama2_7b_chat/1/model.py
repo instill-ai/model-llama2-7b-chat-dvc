@@ -1,235 +1,206 @@
-# pylint: skip-file
-import os
 import random
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+import ray
+import torch
+import transformers
+from transformers import AutoTokenizer
+import numpy as np
 
-# TORCH_GPU_MEMORY_FRACTION = 0.90  # Target memory ~= 15G on 16G card
-TORCH_GPU_MEMORY_FRACTION = 0.43  # Target memory ~= 15G on 40G card
+from instill.helpers.const import DataType, TextGenerationChatInput
+from instill.helpers.ray_io import StandardTaskIO
+from instill.helpers.ray_config import (
+    instill_deployment,
+    get_compose_ray_address,
+    InstillDeployable,
+)
+
+from ray_pb2 import (
+    ModelReadyRequest,
+    ModelReadyResponse,
+    ModelMetadataRequest,
+    ModelMetadataResponse,
+    ModelInferRequest,
+    ModelInferResponse,
+    InferTensor,
+)
 
 import json
-import time
-from pathlib import Path
-
-import traceback
-
-import numpy as np
-import triton_python_backend_utils as pb_utils
 from vllm import SamplingParams, LLM
-
 from conversation import Conversation, conv_templates, SeparatorStyle
 
 
-class TritonPythonModel:
-    def initialize(self, args):
-        self.logger = pb_utils.Logger
-        self.model_config = json.loads(args["model_config"])
-        model_path = str(
-            Path(__file__).parent.absolute().joinpath("Llama-2-7b-chat-hf/")
-        )
+ray.init(address=get_compose_ray_address(10001))
+# this import must come after `ray.init()`
+from ray import serve
 
-        # https://github.com/vllm-project/vllm/blob/main/vllm/entrypoints/llm.py
+
+@instill_deployment
+class Llama2Chat:
+    def __init__(self, model_path: str):
+        # self.application_name = "_".join(model_path.split("/")[3:5])
+        # self.deployement_name = model_path.split("/")[4]
         self.llm_engine = LLM(
             model=model_path,
-            gpu_memory_utilization=TORCH_GPU_MEMORY_FRACTION,
+            gpu_memory_utilization=0.95,
             tensor_parallel_size=1,
         )
 
-        output0_config = pb_utils.get_output_config_by_name(self.model_config, "text")
-        self.output0_dtype = pb_utils.triton_string_to_numpy(
-            output0_config["data_type"]
+    def ModelMetadata(self, req: ModelMetadataRequest) -> ModelMetadataResponse:
+        resp = ModelMetadataResponse(
+            name=req.name,
+            versions=req.version,
+            framework="python",
+            inputs=[
+                ModelMetadataResponse.TensorMetadata(
+                    name="conversation",
+                    datatype=str(DataType.TYPE_STRING.name),
+                    shape=[1],
+                ),
+                ModelMetadataResponse.TensorMetadata(
+                    name="max_new_tokens",
+                    datatype=str(DataType.TYPE_UINT32.name),
+                    shape=[1],
+                ),
+                ModelMetadataResponse.TensorMetadata(
+                    name="temperature",
+                    datatype=str(DataType.TYPE_FP32.name),
+                    shape=[1],
+                ),
+                ModelMetadataResponse.TensorMetadata(
+                    name="top_k",
+                    datatype=str(DataType.TYPE_UINT32.name),
+                    shape=[1],
+                ),
+                ModelMetadataResponse.TensorMetadata(
+                    name="random_seed",
+                    datatype=str(DataType.TYPE_UINT64.name),
+                    shape=[1],
+                ),
+                ModelMetadataResponse.TensorMetadata(
+                    name="extra_params",
+                    datatype=str(DataType.TYPE_STRING.name),
+                    shape=[1],
+                ),
+            ],
+            outputs=[
+                ModelMetadataResponse.TensorMetadata(
+                    name="text",
+                    datatype=str(DataType.TYPE_STRING.name),
+                    shape=[-1, -1],
+                ),
+            ],
+        )
+        return resp
+
+    def ModelReady(self, req: ModelReadyRequest) -> ModelReadyResponse:
+        resp = ModelReadyResponse(ready=True)
+        return resp
+
+    async def ModelInfer(self, request: ModelInferRequest) -> ModelInferResponse:
+        resp = ModelInferResponse(
+            model_name=request.model_name,
+            model_version=request.model_version,
+            outputs=[],
+            raw_output_contents=[],
         )
 
-    def execute(self, requests):
-        responses = []
-        for request in requests:
-            try:
-                # request_id = random_uuid()
-                prompt = str(
-                    pb_utils.get_input_tensor_by_name(request, "conversation")
-                    .as_numpy()[0]
-                    .decode("utf-8")
-                )
-                print(f"[DEBUG] input `prompt` type({type(prompt)}): {prompt}")
+        task_text_generation_chat_input: TextGenerationChatInput = (
+            StandardTaskIO.parse_task_text_generation_chat_input(request=request)
+        )
 
-                prompt_in_conversation = False
-                try:
-                    parsed_conversation = json.loads(prompt)
-                    # turn in to converstation?
+        if task_text_generation_chat_input.temperature <= 0.0:
+            task_text_generation_chat_input.temperature = 0.8
 
-                    # using fixed roles
-                    roles = ["USER", "ASSISTANT"]
-                    roles_lookup = {x: i for i, x in enumerate(roles)}
+        if task_text_generation_chat_input.random_seed > 0:
+            random.seed(task_text_generation_chat_input.random_seed)
+            np.random.seed(task_text_generation_chat_input.random_seed)
+            # torch.manual_seed(task_text_generation_chat_input.random_seed)
+            # if torch.cuda.is_available():
+            #     torch.cuda.manual_seed_all(task_text_generation_chat_input.random_seed)
 
-                    conv = None
-                    for i, x in enumerate(parsed_conversation):
-                        role = str(x["role"]).upper()
-                        print(f'[DEBUG] Message {i}: {role}: {x["content"]}')
-                        if i == 0:
-                            if role == "SYSTEM":
-                                conv = Conversation(
-                                    system=str(x["content"]),
-                                    roles=("USER", "ASSISTANT"),
-                                    version="llama_v2",
-                                    messages=[],
-                                    offset=0,
-                                    sep_style=SeparatorStyle.LLAMA_2,
-                                    sep="<s>",
-                                    sep2="</s>",
-                                )
-                            else:
-                                conv = conv_templates["llama_2"].copy()
-                                conv.roles = tuple(roles)
-                                conv.append_message(
-                                    conv.roles[roles_lookup[role]], x["content"]
-                                )
-                        else:
-                            conv.append_message(
-                                conv.roles[roles_lookup[role]], x["content"]
-                            )
-                    prompt_in_conversation = True
-                except json.decoder.JSONDecodeError:
-                    pass
+        # Handle Prompt
+        prompt = task_text_generation_chat_input.conversation
+        prompt_in_conversation = False
+        try:
+            parsed_conversation = json.loads(prompt)
+            # turn in to converstation?
 
-                if not prompt_in_conversation:
-                    conv = conv_templates["llama_2"].copy()
-                    conv.append_message(conv.roles[0], prompt)
+            # using fixed roles
+            roles = ["USER", "ASSISTANT"]
+            roles_lookup = {x: i for i, x in enumerate(roles)}
 
-                extra_params_str = ""
-                if (
-                    pb_utils.get_input_tensor_by_name(request, "extra_params")
-                    is not None
-                ):
-                    extra_params_str = str(
-                        pb_utils.get_input_tensor_by_name(request, "extra_params")
-                        .as_numpy()[0]
-                        .decode("utf-8")
-                    )
-                print(
-                    f"[DEBUG] input `extra_params` type({type(extra_params_str)}): {extra_params_str}"
-                )
+            conv = None
+            for i, x in enumerate(parsed_conversation):
+                role = str(x["role"]).upper()
+                print(f'[DEBUG] Message {i}: {role}: {x["content"]}')
+                if i == 0:
+                    if role == "SYSTEM":
+                        conv = Conversation(
+                            system=str(x["content"]),
+                            roles=("USER", "ASSISTANT"),
+                            version="llama_v2",
+                            messages=[],
+                            offset=0,
+                            sep_style=SeparatorStyle.LLAMA_2,
+                            sep="<s>",
+                            sep2="</s>",
+                        )
+                    else:
+                        conv = conv_templates["llama_2"].copy()
+                        conv.roles = tuple(roles)
+                        conv.append_message(
+                            conv.roles[roles_lookup[role]], x["content"]
+                        )
+                else:
+                    conv.append_message(conv.roles[roles_lookup[role]], x["content"])
+            prompt_in_conversation = True
+        except json.decoder.JSONDecodeError:
+            pass
 
-                extra_params = {}
-                try:
-                    extra_params = json.loads(extra_params_str)
-                except json.decoder.JSONDecodeError:
-                    pass
+        if not prompt_in_conversation:
+            conv = conv_templates["llama_2"].copy()
+            conv.append_message(conv.roles[0], prompt)
 
-                max_new_tokens = 100
-                if (
-                    pb_utils.get_input_tensor_by_name(request, "max_new_tokens")
-                    is not None
-                ):
-                    max_new_tokens = int(
-                        pb_utils.get_input_tensor_by_name(
-                            request, "max_new_tokens"
-                        ).as_numpy()[0]
-                    )
-                print(
-                    f"[DEBUG] input `max_new_tokens` type({type(max_new_tokens)}): {max_new_tokens}"
-                )
+        sampling_params = SamplingParams(
+            temperature=task_text_generation_chat_input.temperature,
+            max_tokens=task_text_generation_chat_input.max_new_tokens,
+            top_k=task_text_generation_chat_input.top_k
+            # **extra_params,
+        )
 
-                top_k = 1
-                if pb_utils.get_input_tensor_by_name(request, "top_k") is not None:
-                    top_k = int(
-                        pb_utils.get_input_tensor_by_name(request, "top_k").as_numpy()[
-                            0
-                        ]
-                    )
-                print(f"[DEBUG] input `top_k` type({type(top_k)}): {top_k}")
+        vllm_outputs = self.llm_engine.generate(conv.get_prompt(), sampling_params)
 
-                temperature = 0.8
-                if (
-                    pb_utils.get_input_tensor_by_name(request, "temperature")
-                    is not None
-                ):
-                    temperature = float(
-                        pb_utils.get_input_tensor_by_name(
-                            request, "temperature"
-                        ).as_numpy()[0]
-                    )
-                temperature = round(temperature, 2)
-                print(
-                    f"[DEBUG] input `temperature` type({type(temperature)}): {temperature}"
-                )
+        sequences = []
+        for vllm_output in vllm_outputs:
+            # concated_complete_output = prompt + "".join([ # Chat model no needs to repeated the prompt
+            concated_complete_output = "".join(
+                [str(complete_output.text) for complete_output in vllm_output.outputs]
+            )
+            sequences.append(
+                {"generated_text": concated_complete_output.strip()}  # .encode("utf-8")
+            )
 
-                random_seed = 0
-                if (
-                    pb_utils.get_input_tensor_by_name(request, "random_seed")
-                    is not None
-                ):
-                    random_seed = int(
-                        pb_utils.get_input_tensor_by_name(
-                            request, "random_seed"
-                        ).as_numpy()[0]
-                    )
-                print(
-                    f"[DEBUG] input `random_seed` type({type(random_seed)}): {random_seed}"
-                )
+        task_text_generation_chat_output = (
+            StandardTaskIO.parse_task_text_generation_chat_output(sequences=sequences)
+        )
 
-                if random_seed > 0:
-                    random.seed(random_seed)
-                    np.random.seed(random_seed)
-                #    torch.manual_seed(random_seed)
-                #    if torch.cuda.is_available():
-                #        torch.cuda.manual_seed_all(random_seed)
+        resp.outputs.append(
+            InferTensor(
+                name="text",
+                shape=[1, len(sequences)],
+                datatype=str(DataType.TYPE_STRING),
+            )
+        )
 
-                # TODO: Add a extra_params checker
-                # Reference for Sampling Parameters
-                # https://github.com/vllm-project/vllm/blob/v0.2.0/vllm/sampling_params.py
-                sampling_params = SamplingParams(
-                    temperature=temperature,
-                    max_tokens=max_new_tokens,
-                    top_k=top_k,
-                    **extra_params,
-                )
+        resp.raw_output_contents.append(task_text_generation_chat_output)
 
-                # calculate time cost in following function call
-                t0 = time.time()
-                # vllm_outputs = self.llm_engine.generate(prompt, sampling_params)
-                print(f"[DEBUG] Conversation Prompt: \n{conv.get_prompt()}")
-                vllm_outputs = self.llm_engine.generate(
-                    conv.get_prompt(), sampling_params
-                )
-                self.logger.log_info(
-                    f"Inference time cost {time.time()-t0}s with input lenth {len(prompt)}"
-                )
+        return resp
 
-                text_outputs = []
-                for vllm_output in vllm_outputs:
-                    # concated_complete_output = prompt + "".join([ # Chat model no needs to repeated the prompt
-                    concated_complete_output = "".join(
-                        [
-                            str(complete_output.text)
-                            for complete_output in vllm_output.outputs
-                        ]
-                    )
-                    text_outputs.append(
-                        concated_complete_output.strip().encode("utf-8")
-                    )
-                triton_output_tensor = pb_utils.Tensor(
-                    "text", np.asarray(text_outputs, dtype=self.output0_dtype)
-                )
-                responses.append(
-                    pb_utils.InferenceResponse(output_tensors=[triton_output_tensor])
-                )
 
-            except Exception as e:
-                self.logger.log_info(f"Error generating stream: {e}")
-                print("[DEBUG]\n", traceback.format_exc())
-                error = pb_utils.TritonError(f"Error generating stream: {e}")
-                triton_output_tensor = pb_utils.Tensor(
-                    "text", np.asarray(["N/A"], dtype=self.output0_dtype)
-                )
-                response = pb_utils.InferenceResponse(
-                    output_tensors=[triton_output_tensor], error=error
-                )
-                responses.append(response)
-                self.logger.log_info("The model did not receive the expected inputs")
-                raise e
-            return responses
+deployable = InstillDeployable(
+    Llama2Chat, model_weight_or_folder_name="Llama-2-7b-chat-hf/"
+)
 
-        return responses
-
-    def finalize(self):
-        self.logger.log_info("Issuing finalize to vllm backend")
+# you can also have a fine-grained control of the cpu and gpu resources allocation
+deployable.update_num_cpus(4)
+deployable.update_num_gpus(1)
