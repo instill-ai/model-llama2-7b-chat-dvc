@@ -29,11 +29,6 @@ from vllm import SamplingParams, LLM
 from conversation import Conversation, conv_templates, SeparatorStyle
 
 
-ray.init(address=get_compose_ray_address(10001))
-# this import must come after `ray.init()`
-from ray import serve
-
-
 @instill_deployment
 class Llama2Chat:
     def __init__(self, model_path: str):
