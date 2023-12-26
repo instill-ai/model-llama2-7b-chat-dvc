@@ -503,6 +503,49 @@ class Llama2Chat:
         task_text_generation_chat_input: TextGenerationChatInput = (
             StandardTaskIO.parse_task_text_generation_chat_input(request=request)
         )
+        print("----------------________")
+        print(task_text_generation_chat_input)
+        print("----------------________")
+
+        print("print(task_text_generation_chat.prompt")
+        print(task_text_generation_chat_input.prompt)
+        print("-------\n")
+
+        print("print(task_text_generation_chat.prompt_images")
+        print(task_text_generation_chat_input.prompt_images)
+        print("-------\n")
+
+        print("print(task_text_generation_chat.chat_history")
+        print(task_text_generation_chat_input.chat_history)
+        print("-------\n")
+
+        print("print(task_text_generation_chat.system_message")
+        print(task_text_generation_chat_input.system_message)
+        print("-------\n")
+
+        print("print(task_text_generation_chat.max_new_tokens")
+        print(task_text_generation_chat_input.max_new_tokens)
+        print("-------\n")
+
+        print("print(task_text_generation_chat.temperature")
+        print(task_text_generation_chat_input.temperature)
+        print("-------\n")
+
+        print("print(task_text_generation_chat.top_k")
+        print(task_text_generation_chat_input.top_k)
+        print("-------\n")
+
+        print("print(task_text_generation_chat.random_seed")
+        print(task_text_generation_chat_input.random_seed)
+        print("-------\n")
+
+        print("print(task_text_generation_chat.stop_words")
+        print(task_text_generation_chat_input.stop_words)
+        print("-------\n")
+
+        print("print(task_text_generation_chat.extra_params")
+        print(task_text_generation_chat_input.extra_params)
+        print("-------\n")
 
         if task_text_generation_chat_input.temperature <= 0.0:
             task_text_generation_chat_input.temperature = 0.8
