@@ -10,7 +10,6 @@ from instill.helpers.const import DataType, TextGenerationChatInput
 from instill.helpers.ray_io import StandardTaskIO
 from instill.helpers.ray_config import (
     instill_deployment,
-    get_compose_ray_address,
     InstillDeployable,
 )
 
