@@ -635,9 +635,8 @@ class Llama2Chat:
 
 
 deployable = InstillDeployable(
-    Llama2Chat, model_weight_or_folder_name="Llama-2-7b-chat-hf/"
+    Llama2Chat, model_weight_or_folder_name="Llama-2-7b-chat-hf/", use_gpu=True
 )
 
-# you can also have a fine-grained control of the cpu and gpu resources allocation
-deployable.update_num_cpus(4)
-deployable.update_num_gpus(1)
+deployable.update_max_replicas(2)
+deployable.update_min_replicas(0)
