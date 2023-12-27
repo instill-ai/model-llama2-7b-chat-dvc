@@ -188,7 +188,9 @@ class Llama2Chat:
             if input_name == "prompt_images":
                 input_tensors = deserialize_bytes_tensor(b_input_tensor)
                 images = []
+                print("..... inside prompt_images, input_tensors: ", input_tensors)
                 for enc in input_tensors:
+                    print("..... inside prompt_images, enc: ", enc)
                     pil_img = Image.open(io.BytesIO(enc.astype(bytes)))  # RGB
                     image = np.array(pil_img)
                     if len(image.shape) == 2:  # gray image
