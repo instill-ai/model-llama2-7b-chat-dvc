@@ -25,6 +25,9 @@ from ray_pb2 import (
 
 import vllm
 
+import base64
+
+
 import struct
 import io
 import json
@@ -209,7 +212,6 @@ class Llama2Chat:
 
                     try:
                         enc_json = json.loads(str(enc.decode("utf-8")))
-
                         enc_json_index_0 = enc_json[0]
                     except JSONDecodeError:
                         print("[DEBUG] WARNING `enc_json` parsing faield!")
@@ -220,10 +222,11 @@ class Llama2Chat:
                     # pil_img = Image.open(io.BytesIO(trimed_enc))  # RGB
 
                     try:
-                        pil_img = Image.open(io.BytesIO(enc_json_index_0.astype(bytes)))
+                        pil_img = Image.open(
+                            io.BytesIO(base64.b64decode(enc_json_index_0))
+                        )
                     except UnidentifiedImageError:
                         print("Faield: Image.open(io.BytesIO(enc_json_index_0))")
-                        pil_img = Image.open(io.BytesIO(trimed_enc))
 
                     image = np.array(pil_img)
                     if len(image.shape) == 2:  # gray image
