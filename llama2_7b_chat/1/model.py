@@ -78,8 +78,8 @@ class Llama2Chat:
         print(f"This is a Dummy Llama2Chat with path {model_path}")
         print(f"vllm version: {vllm.__version__}")
         print(f"ray version: {ray.__version__}")
-        print(f"transformers version: {transformers.__version__}")
-        print(f"np version: {np.__version__}")
+        # print(f"transformers version: {transformers.__version__}")
+        # print(f"np version: {np.__version__}")
 
     def ModelMetadata(self, req: ModelMetadataRequest) -> ModelMetadataResponse:
         resp = ModelMetadataResponse(
