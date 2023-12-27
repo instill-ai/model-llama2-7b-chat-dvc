@@ -191,7 +191,13 @@ class Llama2Chat:
                 print("..... inside prompt_images, input_tensors: ", input_tensors)
                 for enc in input_tensors:
                     print("..... inside prompt_images, enc: ", enc)
-                    pil_img = Image.open(io.BytesIO(enc.astype(bytes)))  # RGB
+                    if len(enc) == 0:
+                        continue  # of using try - catch (But I think catch is better)
+                    else:
+                        trimed_enc = enc[2:-2]
+                        # model-backend encoede like:
+                        # enc:  b'["/9j "]'"
+                    pil_img = Image.open(io.BytesIO(trimed_enc.astype(bytes)))  # RGB
                     image = np.array(pil_img)
                     if len(image.shape) == 2:  # gray image
                         raise ValueError(
