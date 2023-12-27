@@ -218,17 +218,12 @@ class Llama2Chat:
                         f"enc_json_index_0 has type({type(enc_json_index_0)}), with content: {enc_json_index_0[:10]} ... {enc_json_index_0[-10:]}"
                     )
                     # pil_img = Image.open(io.BytesIO(trimed_enc))  # RGB
-                    try:
-                        pil_img = Image.open(io.BytesIO(enc_json_index_0))
-                    except UnidentifiedImageError:
-                        print("Faield: Image.open(io.BytesIO(enc_json_index_0))")
 
                     try:
                         pil_img = Image.open(io.BytesIO(enc_json_index_0.astype(bytes)))
                     except UnidentifiedImageError:
                         print("Faield: Image.open(io.BytesIO(enc_json_index_0))")
-
-                    pil_img = Image.open(io.BytesIO(trimed_enc))
+                        pil_img = Image.open(io.BytesIO(trimed_enc))
 
                     image = np.array(pil_img)
                     if len(image.shape) == 2:  # gray image
