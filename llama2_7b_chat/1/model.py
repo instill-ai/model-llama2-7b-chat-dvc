@@ -197,7 +197,9 @@ class Llama2Chat:
                         trimed_enc = enc[2:-2]
                         # model-backend encoede like:
                         # enc:  b'["/9j "]'"
-                    pil_img = Image.open(io.BytesIO(trimed_enc.astype(bytes)))  # RGB
+                    if not type(trimed_enc) == bytes:
+                        trimed_enc = trimed_enc.astype(bytes)
+                    pil_img = Image.open(io.BytesIO(trimed_enc))  # RGB
                     image = np.array(pil_img)
                     if len(image.shape) == 2:  # gray image
                         raise ValueError(
@@ -301,9 +303,10 @@ class Llama2Chat:
                     continue
 
         print("???????????????????????????")
-        task_text_generation_chat_input: TextGenerationChatInput = (
-            StandardTaskIO.parse_task_text_generation_chat_input(request=request)
-        )
+        # task_text_generation_chat_input: TextGenerationChatInput = (
+        #     StandardTaskIO.parse_task_text_generation_chat_input(request=request)
+        # )
+        task_text_generation_chat_input = text_generation_chat_input
         print("----------------________")
         print(task_text_generation_chat_input)
         print("----------------________")
