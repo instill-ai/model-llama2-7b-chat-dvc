@@ -25,6 +25,45 @@ from ray_pb2 import (
 
 import vllm
 
+import struct
+import io
+import json
+import struct
+from json.decoder import JSONDecodeError
+
+import numpy as np
+from PIL import Image
+
+
+def deserialize_bytes_tensor(encoded_tensor):
+    """
+    Deserializes an encoded bytes tensor into an
+    numpy array of dtype of python objects
+
+    Parameters
+    ----------
+    encoded_tensor : bytes
+        The encoded bytes tensor where each element
+        has its length in first 4 bytes followed by
+        the content
+    Returns
+    -------
+    string_tensor : np.array
+        The 1-D numpy array of type object containing the
+        deserialized bytes in 'C' order.
+
+    """
+    strs = []
+    offset = 0
+    val_buf = encoded_tensor
+    while offset < len(val_buf):
+        l = struct.unpack_from("<I", val_buf, offset)[0]
+        offset += 4
+        sb = struct.unpack_from(f"<{l}s", val_buf, offset)[0]
+        offset += l
+        strs.append(sb)
+    return np.array(strs, dtype=bytes)
+
 
 @instill_deployment
 class Llama2Chat:
@@ -115,7 +154,145 @@ class Llama2Chat:
             outputs=[],
             raw_output_contents=[],
         )
+        print("???????????????????????????")
+        print(request)
+        from typing import Any, Dict, List, Union
 
+        class TextGenerationChatInput:
+            prompt = ""
+            prompt_images: Union[List[np.ndarray], None] = None
+            chat_history: Union[List[str], None] = None
+            system_message: Union[str, None] = None
+            max_new_tokens = 100
+            temperature = 0.8
+            top_k = 1
+            random_seed = 0
+            stop_words: Any = ""  # Optional
+            extra_params: Dict[str, str] = {}
+
+        text_generation_chat_input = TextGenerationChatInput()
+        for i, b_input_tensor in zip(request.inputs, request.raw_input_contents):
+            input_name = i.name
+
+            print("..... parse: ", input_name)
+            print(text_generation_chat_input)
+            print("...")
+            if input_name == "prompt":
+                input_tensor = deserialize_bytes_tensor(b_input_tensor)
+                text_generation_chat_input.prompt = str(input_tensor[0].decode("utf-8"))
+                print(
+                    f"[DEBUG] input `prompt` type\
+                        ({type(text_generation_chat_input.prompt)}): {text_generation_chat_input.prompt}"
+                )
+
+            if input_name == "prompt_images":
+                input_tensors = deserialize_bytes_tensor(b_input_tensor)
+                images = []
+                for enc in input_tensors:
+                    pil_img = Image.open(io.BytesIO(enc.astype(bytes)))  # RGB
+                    image = np.array(pil_img)
+                    if len(image.shape) == 2:  # gray image
+                        raise ValueError(
+                            f"The image shape with {image.shape} is "
+                            f"not in acceptable"
+                        )
+                    images.append(image)
+                # TODO: check wethere there are issues in batch size dimention
+                text_generation_chat_input.prompt_images = images
+                print(
+                    "[DEBUG] input `prompt_images` type"
+                    f"({type(text_generation_chat_input.prompt_images)}): "
+                    f"{text_generation_chat_input.prompt_images}"
+                )
+
+            if input_name == "chat_history":
+                input_tensor = deserialize_bytes_tensor(b_input_tensor)
+                chat_history_str = str(input_tensor[0].decode("utf-8"))
+                print(
+                    "[DEBUG] input `chat_history_str` type"
+                    f"({type(chat_history_str)}): "
+                    f"{chat_history_str}"
+                )
+                try:
+                    text_generation_chat_input.chat_history = json.loads(
+                        chat_history_str
+                    )
+                except JSONDecodeError:
+                    print("[DEBUG] WARNING `extra_params` parsing faield!")
+                    continue
+
+            if input_name == "system_message":
+                input_tensor = deserialize_bytes_tensor(b_input_tensor)
+                text_generation_chat_input.system_message = str(
+                    input_tensor[0].decode("utf-8")
+                )
+                print(
+                    "[DEBUG] input `system_message` type"
+                    f"({type(text_generation_chat_input.system_message)}): "
+                    f"{text_generation_chat_input.system_message}"
+                )
+
+            if input_name == "max_new_tokens":
+                text_generation_chat_input.max_new_tokens = int.from_bytes(
+                    b_input_tensor, "little"
+                )
+                print(
+                    "[DEBUG] input `max_new_tokens` type"
+                    f"({type(text_generation_chat_input.max_new_tokens)}): "
+                    f"{text_generation_chat_input.max_new_tokens}"
+                )
+
+            if input_name == "top_k":
+                text_generation_chat_input.top_k = int.from_bytes(
+                    b_input_tensor, "little"
+                )
+                print(
+                    "[DEBUG] input `top_k` type"
+                    f"({type(text_generation_chat_input.top_k)}): "
+                    f"{text_generation_chat_input.top_k}"
+                )
+
+            if input_name == "temperature":
+                text_generation_chat_input.temperature = struct.unpack(
+                    "f", b_input_tensor
+                )[0]
+                print(
+                    "[DEBUG] input `temperature` type"
+                    f"({type(text_generation_chat_input.temperature)}): "
+                    f"{text_generation_chat_input.temperature}"
+                )
+                text_generation_chat_input.temperature = round(
+                    text_generation_chat_input.temperature, 2
+                )
+
+            if input_name == "random_seed":
+                text_generation_chat_input.random_seed = int.from_bytes(
+                    b_input_tensor, "little"
+                )
+                print(
+                    "[DEBUG] input `random_seed` type"
+                    f"({type(text_generation_chat_input.random_seed)}): "
+                    f"{text_generation_chat_input.random_seed}"
+                )
+
+            if input_name == "extra_params":
+                input_tensor = deserialize_bytes_tensor(b_input_tensor)
+                extra_params_str = str(input_tensor[0].decode("utf-8"))
+                print(
+                    "[DEBUG] input `extra_params` type"
+                    f"({type(extra_params_str)}): "
+                    f"{extra_params_str}"
+                )
+
+                try:
+                    text_generation_chat_input.extra_params = json.loads(
+                        extra_params_str
+                    )
+                except JSONDecodeError:
+                    print("[DEBUG] WARNING `extra_params` parsing faield!")
+                    continue
+
+        print("???????????????????????????")
         task_text_generation_chat_input: TextGenerationChatInput = (
             StandardTaskIO.parse_task_text_generation_chat_input(request=request)
         )
