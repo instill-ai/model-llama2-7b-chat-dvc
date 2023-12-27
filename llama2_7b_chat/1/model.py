@@ -32,7 +32,7 @@ import struct
 from json.decoder import JSONDecodeError
 
 import numpy as np
-from PIL import Image
+from PIL import Image, UnidentifiedImageError
 
 
 def deserialize_bytes_tensor(encoded_tensor):
@@ -197,9 +197,39 @@ class Llama2Chat:
                         trimed_enc = enc[2:-2]
                         # model-backend encoede like:
                         # enc:  b'["/9j "]'"
+
+                    print(
+                        f"ens has type({type(enc)}), with content: {enc[:10]} ... {enc[-10:]}"
+                    )
+                    print(
+                        f"trimed_enc has type({type(trimed_enc)}), with content: {trimed_enc[:10]} ... {trimed_enc[-10:]}"
+                    )
                     if not type(trimed_enc) == bytes:
                         trimed_enc = trimed_enc.astype(bytes)
-                    pil_img = Image.open(io.BytesIO(trimed_enc))  # RGB
+
+                    try:
+                        enc_json = json.loads(str(enc.decode("utf-8")))
+
+                        enc_json_index_0 = enc_json[0]
+                    except JSONDecodeError:
+                        print("[DEBUG] WARNING `enc_json` parsing faield!")
+
+                    print(
+                        f"enc_json_index_0 has type({type(enc_json_index_0)}), with content: {enc_json_index_0[:10]} ... {enc_json_index_0[-10:]}"
+                    )
+                    # pil_img = Image.open(io.BytesIO(trimed_enc))  # RGB
+                    try:
+                        pil_img = Image.open(io.BytesIO(enc_json_index_0))
+                    except UnidentifiedImageError:
+                        print("Faield: Image.open(io.BytesIO(enc_json_index_0))")
+
+                    try:
+                        pil_img = Image.open(io.BytesIO(enc_json_index_0.astype(bytes)))
+                    except UnidentifiedImageError:
+                        print("Faield: Image.open(io.BytesIO(enc_json_index_0))")
+
+                    pil_img = Image.open(io.BytesIO(trimed_enc))
+
                     image = np.array(pil_img)
                     if len(image.shape) == 2:  # gray image
                         raise ValueError(
