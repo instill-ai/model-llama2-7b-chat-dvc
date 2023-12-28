@@ -375,28 +375,6 @@ class Llama2Chat:
         print(task_text_generation_chat_input.extra_params)
         print("-------\n")
 
-        if task_text_generation_chat_input.temperature <= 0.0:
-            task_text_generation_chat_input.temperature = 0.8
-
-        if task_text_generation_chat_input.random_seed > 0:
-            random.seed(task_text_generation_chat_input.random_seed)
-            np.random.seed(task_text_generation_chat_input.random_seed)
-            # torch.manual_seed(task_text_generation_chat_input.random_seed)
-            # if torch.cuda.is_available():
-            #     torch.cuda.manual_seed_all(task_text_generation_chat_input.random_seed)
-
-        # Handle Prompt
-        # prompt = task_text_generation_chat_input.conversation
-        # prompt_in_conversation = False
-        # try:
-        # parsed_conversation = json.loads(prompt)
-        parsed_conversation = task_text_generation_chat_input.conversation
-        # turn in to converstation?
-
-        # using fixed roles
-        roles = ["USER", "ASSISTANT"]
-        roles_lookup = {x: i for i, x in enumerate(roles)}
-
         sequences = []
 
         sequences.append(
