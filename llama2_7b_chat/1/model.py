@@ -447,7 +447,22 @@ class Llama2Chat:
             framework="python",
             inputs=[
                 ModelMetadataResponse.TensorMetadata(
-                    name="conversation",
+                    name="prompt",
+                    datatype=str(DataType.TYPE_STRING.name),
+                    shape=[1],
+                ),
+                ModelMetadataResponse.TensorMetadata(
+                    name="prompt_images",
+                    datatype=str(DataType.TYPE_STRING.name),
+                    shape=[1],
+                ),
+                ModelMetadataResponse.TensorMetadata(
+                    name="chat_history",
+                    datatype=str(DataType.TYPE_STRING.name),
+                    shape=[1],
+                ),
+                ModelMetadataResponse.TensorMetadata(
+                    name="system_message",
                     datatype=str(DataType.TYPE_STRING.name),
                     shape=[1],
                 ),
@@ -552,51 +567,9 @@ class Llama2Chat:
         if task_text_generation_chat_input.random_seed > 0:
             random.seed(task_text_generation_chat_input.random_seed)
             np.random.seed(task_text_generation_chat_input.random_seed)
-            # torch.manual_seed(task_text_generation_chat_input.random_seed)
-            # if torch.cuda.is_available():
-            #     torch.cuda.manual_seed_all(task_text_generation_chat_input.random_seed)
-
-        # Handle Prompt
-        # prompt = task_text_generation_chat_input.conversation
-        # prompt_in_conversation = False
-        # try:
-        # parsed_conversation = json.loads(prompt)
-        parsed_conversation = task_text_generation_chat_input.conversation
-        # turn in to converstation?
-
-        # using fixed roles
-        roles = ["USER", "ASSISTANT"]
-        roles_lookup = {x: i for i, x in enumerate(roles)}
-
-        conv = None
-        for i, x in enumerate(parsed_conversation):
-            role = str(x["role"]).upper()
-            print(f'[DEBUG] Message {i}: {role}: {x["content"]}')
-            if i == 0:
-                if role == "SYSTEM":
-                    conv = Conversation(
-                        system=str(x["content"]),
-                        roles=("USER", "ASSISTANT"),
-                        version="llama_v2",
-                        messages=[],
-                        offset=0,
-                        sep_style=SeparatorStyle.LLAMA_2,
-                        sep="<s>",
-                        sep2="</s>",
-                    )
-                else:
-                    conv = conv_templates["llama_2"].copy()
-                    conv.roles = tuple(roles)
-                    conv.append_message(conv.roles[roles_lookup[role]], x["content"])
-            else:
-                conv.append_message(conv.roles[roles_lookup[role]], x["content"])
-        # prompt_in_conversation = True
-        # except json.decoder.JSONDecodeError:
-        #     pass
-
         # if not prompt_in_conversation:
-        #     conv = conv_templates["llama_2"].copy()
-        #     conv.append_message(conv.roles[0], "prompt")
+        conv = conv_templates["llama_2"].copy()
+        conv.append_message(conv.roles[0], task_text_generation_chat_input.prompt)
 
         sampling_params = SamplingParams(
             temperature=task_text_generation_chat_input.temperature,
