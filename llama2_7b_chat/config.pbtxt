@@ -31,7 +31,7 @@ input [
     dims: [ 1 ]
   },
   {
-    name: "system_messages"
+    name: "system_message"
     data_type: TYPE_STRING
     dims: [ 1 ]
   },

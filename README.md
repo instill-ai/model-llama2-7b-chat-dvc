@@ -21,12 +21,19 @@ Notes:
     "task_inputs": [
         {
             "text_generation_chat": {
-                "conversation": "[{\"role\": \"system\", \"content\": \"You are a helpful assistant.\"},{\"role\": \"user\", \"content\": \"Who won the world series in 2020?\"},{\"role\": \"assistant\", \"content\": \"The Los Angeles Dodgers won the World Series in 2020.\"},{\"role\": \"user\", \"content\": \"Where was it played?\"}]",
-                "max_new_tokens": "100",
+                "prompt": "What is your name?",
+                "system_message": "You are a helpful robot named Tony.",
+                "max_new_tokens": "500",
                 "temperature": "0.8",
-                "top_k": "20",
-                "random_seed": "0",
-                "extra_params": "{\"top_p\": 0.8, \"frequency_penalty\": 1.2}"
+                "top_k": "10",
+                "seed": "42"
+                // ,"extra_params": {
+                //     "test_param_string": "test_param_string_value",
+                //     "test_param_int": 123,
+                //     "test_param_float": 0.2,
+                //     "test_param_arr": [1, 2, 3],
+                //     "test_param_onject": { "some_key": "some_value" }
+                // }
             }
         }
     ]

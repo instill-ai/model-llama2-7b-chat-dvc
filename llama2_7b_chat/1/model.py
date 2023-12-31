@@ -13,19 +13,7 @@ os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
 TORCH_GPU_MEMORY_FRACTION = 0.90  # Target memory ~= 15G on 16G card
 # TORCH_GPU_MEMORY_FRACTION = 0.43  # Target memory ~= 15G on 40G card
-"""
-For testing purposes:
-move dvc content and .dvc
 
-origin .dvc:
-[core]
-    autostage = true
-    remote = gs
-['remote "gs"']
-    url = gs://public-europe-west2-c-artifacts/vdp/public-dvc-models/model-llama2-7b-chat/hf_v2-dvc2_34
-
-origin dvc content:
-"""
 import json
 import time
 from pathlib import Path
@@ -63,13 +51,13 @@ class TritonPythonModel:
         )
 
         print(f"test model_path {model_path}")
-        # REMOVE COMMENT AFTER TEST
-        # # https://github.com/vllm-project/vllm/blob/main/vllm/entrypoints/llm.py
-        # self.llm_engine = LLM(
-        #     model=model_path,
-        #     gpu_memory_utilization=TORCH_GPU_MEMORY_FRACTION,
-        #     tensor_parallel_size=1,
-        # )
+
+        # https://github.com/vllm-project/vllm/blob/main/vllm/entrypoints/llm.py
+        self.llm_engine = LLM(
+            model=model_path,
+            gpu_memory_utilization=TORCH_GPU_MEMORY_FRACTION,
+            tensor_parallel_size=1,
+        )
 
         output0_config = pb_utils.get_output_config_by_name(self.model_config, "text")
         self.output0_dtype = pb_utils.triton_string_to_numpy(
@@ -82,6 +70,17 @@ class TritonPythonModel:
             text_generation_input = TextGenerationInput()
 
             if pb_utils.get_input_tensor_by_name(request, "prompt") is not None:
+                print(pb_utils.get_input_tensor_by_name(request, "prompt").as_numpy())
+                print(
+                    pb_utils.get_input_tensor_by_name(request, "prompt")
+                    .as_numpy()
+                    .shape
+                )
+                print(
+                    type(
+                        pb_utils.get_input_tensor_by_name(request, "prompt").as_numpy()
+                    )
+                )
                 text_generation_input.prompt = str(
                     pb_utils.get_input_tensor_by_name(request, "prompt")
                     .as_numpy()[0]
@@ -93,7 +92,7 @@ class TritonPythonModel:
             if pb_utils.get_input_tensor_by_name(request, "prompt_images") is not None:
                 input_tensors = pb_utils.get_input_tensor_by_name(
                     request, "prompt_images"
-                )
+                ).as_numpy()
                 images = []
                 for enc in input_tensors:
                     if len(enc) == 0:
@@ -116,7 +115,7 @@ class TritonPythonModel:
                     images.append(image)
                 text_generation_input.prompt_images = images
 
-            if pb_utils.get_input_tensor_by_name(request, "chat_history") is not None:
+                # if pb_utils.get_input_tensor_by_name(request, "chat_history") is not None:
                 chat_history_str = str(
                     pb_utils.get_input_tensor_by_name(request, "chat_history")
                     .as_numpy()[0]
@@ -133,6 +132,8 @@ class TritonPythonModel:
                     .as_numpy()[0]
                     .decode("utf-8")
                 )
+                if len(text_generation_input.system_message) == 0:
+                    text_generation_input.system_message = None
 
             if pb_utils.get_input_tensor_by_name(request, "max_new_tokens") is not None:
                 text_generation_input.max_new_tokens = int(
@@ -216,6 +217,7 @@ class TritonPythonModel:
                     role = str(chat_entity["role"]).upper()
                     chat_history_messages = None
                     chat_hisotry_images = []
+
                     for chat_entity_message in chat_entity["content"]:
                         if chat_entity_message["type"] == "text":
                             if chat_history_messages is not None:
@@ -223,28 +225,54 @@ class TritonPythonModel:
                                     "Multiple text message detected"
                                     " in a single chat history entity"
                                 )
-                            chat_history_messages = chat_entity_message["text"]
+                            # [{'role': 'system', 'content': [{'type': 'text', 'Content': {'Text': "What's in this image?"}}]}]
+                            chat_history_messages = chat_entity_message["Content"][
+                                "Text"
+                            ]
                         elif chat_entity_message["type"] == "image_url":
                             # TODO: imeplement image parser in model_backedn
                             # This field is expected to be base64 encoded string
                             IMAGE_BASE64_PREFIX = (
                                 "data:image/jpeg;base64,"  # "{base64_image}"
                             )
-                            if chat_entity_message["url"].startswith("http"):
+                            print(
+                                'chat_entity_message["Content"]\n',
+                                chat_entity_message["Content"],
+                            )
+
+                            if len(chat_entity_message["Content"]["ImageUrl"]) == 0:
+                                ...
+                            elif (
+                                "promptImageUrl"
+                                in chat_entity_message["Content"]["ImageUrl"][
+                                    "image_url"
+                                ]["Type"]
+                            ):
                                 image = Image.open(
                                     io.BytesIO(
-                                        requests.get(chat_entity_message["url"]).content
+                                        requests.get(
+                                            chat_entity_message["Content"]["ImageUrl"][
+                                                "image_url"
+                                            ]["Type"]["promptImageUrl"]
+                                        ).content
                                     )
                                 )
                                 chat_hisotry_images.append(image)
-                            elif chat_entity_message["url"].startswith(
-                                IMAGE_BASE64_PREFIX
+                            elif (
+                                "promptImageBase64"
+                                in chat_entity_message["Content"]["ImageUrl"][
+                                    "image_url"
+                                ]["Type"]
                             ):
+                                image_base64_str = chat_entity_message["Content"][
+                                    "ImageUrl"
+                                ]["image_url"]["Type"]["promptImageBase64"]
+                                if image_base64_str.startswith(IMAGE_BASE64_PREFIX):
+                                    image_base64_str = image_base64_str[
+                                        IMAGE_BASE64_PREFIX:
+                                    ]
                                 # expected content in url with base64 format:
                                 # f"data:image/jpeg;base64,{base64_image}"
-                                image_base64_str = chat_entity_message["url"][
-                                    len(IMAGE_BASE64_PREFIX) + 1 :
-                                ]
                                 pil_img = Image.open(
                                     io.BytesIO(base64.b64decode(image_base64_str))
                                 )
@@ -296,23 +324,24 @@ class TritonPythonModel:
                         "explain why instead of answering something not correct. If you don't "
                         "know the answer to a question, please don't share false information."
                     )
-                    conv = Conversation(
-                        system=default_system_message,
-                        roles=tuple(prompt_roles[:-1]),
-                        version="llama_v2",
-                        messages=prompt_conversation,
-                        offset=0,
-                        sep_style=SeparatorStyle.LLAMA_2,
-                        sep="<s>",
-                        sep2="</s>",
-                    )
+                conv = Conversation(
+                    system=default_system_message,
+                    roles=tuple(prompt_roles[:-1]),
+                    version="llama_v2",
+                    messages=prompt_conversation,
+                    offset=0,
+                    sep_style=SeparatorStyle.LLAMA_2,
+                    sep="<s>",
+                    sep2="</s>",
+                )
+                conv.append_message(conv.roles[0], text_generation_input.prompt)
             else:
                 if text_generation_input.system_message is not None:
                     conv = Conversation(
                         system=text_generation_input.system_message,
                         roles=tuple(prompt_roles[:-1]),
                         version="llama_v2",
-                        messages=(),
+                        messages=[],
                         offset=0,
                         sep_style=SeparatorStyle.LLAMA_2,
                         sep="<s>",
@@ -329,41 +358,33 @@ class TritonPythonModel:
                 # if torch.cuda.is_available():
                 #     torch.cuda.manual_seed_all(text_generation_input.random_seed)
 
-            # # Reference for Sampling Parameters
-            # # https://github.com/vllm-project/vllm/blob/v0.2.0/vllm/sampling_params.py
-            # sampling_params = SamplingParams(
-            #     temperature=text_generation_input.temperature,
-            #     max_tokens=text_generation_input.max_new_tokens,
-            #     top_k=text_generation_input.top_k,
-            #     **text_generation_input.extra_params, # TODO: Implement an extra_params checker
-            # )
+            # Reference for Sampling Parameters
+            # https://github.com/vllm-project/vllm/blob/v0.2.0/vllm/sampling_params.py
+            sampling_params = SamplingParams(
+                temperature=text_generation_input.temperature,
+                max_tokens=text_generation_input.max_new_tokens,
+                top_k=text_generation_input.top_k,
+                **text_generation_input.extra_params,  # TODO: Implement an extra_params checker
+            )
 
             # calculate time cost in following function call
-            # t0 = time.time()
-            # vllm_outputs = self.llm_engine.generate(prompt, sampling_params)
+            t0 = time.time()
             print("----------------")
             print(f"[DEBUG] Conversation Prompt: \n{conv.get_prompt()}")
             print("----------------")
 
-            # vllm_outputs = self.llm_engine.generate(
-            #     conv.get_prompt(), sampling_params
-            # )
-            # self.logger.log_info(
-            #     f"Inference time cost {time.time()-t0}s with input lenth {len(prompt)}"
-            # )
+            vllm_outputs = self.llm_engine.generate(conv.get_prompt(), sampling_params)
+            self.logger.log_info(f"Inference time cost {time.time()-t0}s")
 
-            text_outputs = ["Testing Success"]
-            # for vllm_output in vllm_outputs:
-            #     # concated_complete_output = prompt + "".join([ # Chat model no needs to repeated the prompt
-            #     concated_complete_output = "".join(
-            #         [
-            #             str(complete_output.text)
-            #             for complete_output in vllm_output.outputs
-            #         ]
-            #     )
-            #     text_outputs.append(
-            #         concated_complete_output.strip().encode("utf-8")
-            # )
+            text_outputs = []
+            for vllm_output in vllm_outputs:
+                concated_complete_output = "".join(
+                    [
+                        str(complete_output.text)
+                        for complete_output in vllm_output.outputs
+                    ]
+                )
+                text_outputs.append(concated_complete_output.strip().encode("utf-8"))
             triton_output_tensor = pb_utils.Tensor(
                 "text", np.asarray(text_outputs, dtype=self.output0_dtype)
             )
