@@ -70,17 +70,6 @@ class TritonPythonModel:
             text_generation_input = TextGenerationInput()
 
             if pb_utils.get_input_tensor_by_name(request, "prompt") is not None:
-                print(pb_utils.get_input_tensor_by_name(request, "prompt").as_numpy())
-                print(
-                    pb_utils.get_input_tensor_by_name(request, "prompt")
-                    .as_numpy()
-                    .shape
-                )
-                print(
-                    type(
-                        pb_utils.get_input_tensor_by_name(request, "prompt").as_numpy()
-                    )
-                )
                 text_generation_input.prompt = str(
                     pb_utils.get_input_tensor_by_name(request, "prompt")
                     .as_numpy()[0]
@@ -115,16 +104,17 @@ class TritonPythonModel:
                     images.append(image)
                 text_generation_input.prompt_images = images
 
-                # if pb_utils.get_input_tensor_by_name(request, "chat_history") is not None:
-                chat_history_str = str(
-                    pb_utils.get_input_tensor_by_name(request, "chat_history")
-                    .as_numpy()[0]
-                    .decode("utf-8")
-                )
-                try:
-                    text_generation_input.chat_history = json.loads(chat_history_str)
-                except json.decoder.JSONDecodeError:
-                    pass
+            # TODO: Support chat_history in next version
+            # if pb_utils.get_input_tensor_by_name(request, "chat_history") is not None:
+            #     chat_history_str = str(
+            #         pb_utils.get_input_tensor_by_name(request, "chat_history")
+            #         .as_numpy()[0]
+            #         .decode("utf-8")
+            #     )
+            #     try:
+            #         text_generation_input.chat_history = json.loads(chat_history_str)
+            #     except json.decoder.JSONDecodeError:
+            #         pass
 
             if pb_utils.get_input_tensor_by_name(request, "system_message") is not None:
                 text_generation_input.system_message = str(
@@ -235,13 +225,8 @@ class TritonPythonModel:
                             IMAGE_BASE64_PREFIX = (
                                 "data:image/jpeg;base64,"  # "{base64_image}"
                             )
-                            print(
-                                'chat_entity_message["Content"]\n',
-                                chat_entity_message["Content"],
-                            )
-
                             if len(chat_entity_message["Content"]["ImageUrl"]) == 0:
-                                ...
+                                continue
                             elif (
                                 "promptImageUrl"
                                 in chat_entity_message["Content"]["ImageUrl"][
