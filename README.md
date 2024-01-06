@@ -16,17 +16,53 @@ Notes:
 - Disk Space Requirements: 13G
 - GPU Memory Requirements: 14G
 
-```
+```json
 {
     "task_inputs": [
         {
             "text_generation_chat": {
-                "conversation": "[{\"role\": \"system\", \"content\": \"You are a helpful assistant.\"},{\"role\": \"user\", \"content\": \"Who won the world series in 2020?\"},{\"role\": \"assistant\", \"content\": \"The Los Angeles Dodgers won the World Series in 2020.\"},{\"role\": \"user\", \"content\": \"Where was it played?\"}]",
+                "prompt": "Yo, what's your name?",
+                "chat_history": [
+                    {
+                        "role": "system",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "Your nams is Tony. A helpful assistant."
+                            }
+                        ]
+                    }
+                    ,{
+                        "role": "user",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "I like to call you Toro."
+                            }
+                        ]
+                    },
+                    {
+                        "role": "ASSISTANT",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "Ok, My name is Toro. What can I help you?"
+                            }
+                        ]
+                    }
+                ],
+                // "system_message": "You are not a human.", // You can use either chat_history or system_message
                 "max_new_tokens": "100",
                 "temperature": "0.8",
-                "top_k": "20",
-                "random_seed": "0",
-                "extra_params": "{\"top_p\": 0.8, \"frequency_penalty\": 1.2}"
+                "top_k": "10",
+                "seed": "42"
+                // ,"extra_params": {
+                //     "test_param_string": "test_param_string_value",
+                //     "test_param_int": 123,
+                //     "test_param_float": 0.2,
+                //     "test_param_arr": [1, 2, 3],
+                //     "test_param_onject": { "some_key": "some_value" }
+                // }
             }
         }
     ]
