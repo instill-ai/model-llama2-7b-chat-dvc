@@ -11,8 +11,8 @@ import random
 
 os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
-TORCH_GPU_MEMORY_FRACTION = 0.90  # Target memory ~= 15G on 16G card
-# TORCH_GPU_MEMORY_FRACTION = 0.43  # Target memory ~= 15G on 40G card
+# TORCH_GPU_MEMORY_FRACTION = 0.90  # Target memory ~= 15G on 16G card
+TORCH_GPU_MEMORY_FRACTION = 0.43  # Target memory ~= 15G on 40G card
 
 import json
 import time
