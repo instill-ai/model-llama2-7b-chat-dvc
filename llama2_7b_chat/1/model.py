@@ -11,8 +11,8 @@ import random
 
 os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
-# TORCH_GPU_MEMORY_FRACTION = 0.90  # Target memory ~= 15G on 16G card
-TORCH_GPU_MEMORY_FRACTION = 0.43  # Target memory ~= 15G on 40G card
+TORCH_GPU_MEMORY_FRACTION = 0.90  # Target memory ~= 15G on 16G card
+# TORCH_GPU_MEMORY_FRACTION = 0.43  # Target memory ~= 15G on 40G card
 
 import json
 import time
@@ -104,17 +104,16 @@ class TritonPythonModel:
                     images.append(image)
                 text_generation_input.prompt_images = images
 
-            # TODO: Support chat_history in next version
-            # if pb_utils.get_input_tensor_by_name(request, "chat_history") is not None:
-            #     chat_history_str = str(
-            #         pb_utils.get_input_tensor_by_name(request, "chat_history")
-            #         .as_numpy()[0]
-            #         .decode("utf-8")
-            #     )
-            #     try:
-            #         text_generation_input.chat_history = json.loads(chat_history_str)
-            #     except json.decoder.JSONDecodeError:
-            #         pass
+            if pb_utils.get_input_tensor_by_name(request, "chat_history") is not None:
+                chat_history_str = str(
+                    pb_utils.get_input_tensor_by_name(request, "chat_history")
+                    .as_numpy()[0]
+                    .decode("utf-8")
+                )
+                try:
+                    text_generation_input.chat_history = json.loads(chat_history_str)
+                except json.decoder.JSONDecodeError:
+                    pass
 
             if pb_utils.get_input_tensor_by_name(request, "system_message") is not None:
                 text_generation_input.system_message = str(
