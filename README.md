@@ -16,7 +16,7 @@ Notes:
 - Disk Space Requirements: 13G
 - GPU Memory Requirements: 14G
 
-```ba
+```json
 {
     "task_inputs": [
         {
