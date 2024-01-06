@@ -16,14 +16,43 @@ Notes:
 - Disk Space Requirements: 13G
 - GPU Memory Requirements: 14G
 
-```
+```ba
 {
     "task_inputs": [
         {
             "text_generation_chat": {
-                "prompt": "What is your name?",
-                "system_message": "You are a helpful robot named Tony.",
-                "max_new_tokens": "500",
+                "prompt": "Yo, what's your name?",
+                "chat_history": [
+                    {
+                        "role": "system",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "Your nams is Tony. A helpful assistant."
+                            }
+                        ]
+                    }
+                    ,{
+                        "role": "user",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "I like to call you Toro."
+                            }
+                        ]
+                    },
+                    {
+                        "role": "ASSISTANT",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "Ok, My name is Toro. What can I help you?"
+                            }
+                        ]
+                    }
+                ],
+                // "system_message": "You are not a human.", // You can use either chat_history or system_message
+                "max_new_tokens": "100",
                 "temperature": "0.8",
                 "top_k": "10",
                 "seed": "42"
