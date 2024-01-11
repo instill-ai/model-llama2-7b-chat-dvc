@@ -23,7 +23,12 @@ from ray_pb2 import (
     InferTensor,
 )
 
+import io
 import json
+import time
+import requests
+import base64
+from PIL import Image
 from vllm import SamplingParams, LLM
 
 # from conversation import Conversation, conv_templates, SeparatorStyle
@@ -567,18 +572,164 @@ class Llama2Chat:
         if task_text_generation_chat_input.random_seed > 0:
             random.seed(task_text_generation_chat_input.random_seed)
             np.random.seed(task_text_generation_chat_input.random_seed)
-        # if not prompt_in_conversation:
-        conv = conv_templates["llama_2"].copy()
-        conv.append_message(conv.roles[0], task_text_generation_chat_input.prompt)
 
+        # Process chat_history
+        # Preprocessing
+        prompt_roles = ["USER", "ASSISTANT", "SYSTEM"]
+        if (
+            task_text_generation_chat_input.chat_history is not None
+            and len(task_text_generation_chat_input.chat_history) > 0
+        ):
+            prompt_conversation = []
+            default_system_message = task_text_generation_chat_input.system_message
+            for chat_entity in task_text_generation_chat_input.chat_history:
+                role = str(chat_entity["role"]).upper()
+                chat_history_messages = None
+                chat_hisotry_images = []
+
+                for chat_entity_message in chat_entity["content"]:
+                    if chat_entity_message["type"] == "text":
+                        if chat_history_messages is not None:
+                            raise ValueError(
+                                "Multiple text message detected"
+                                " in a single chat history entity"
+                            )
+                        # [{'role': 'system', 'content': [{'type': 'text', 'Content': {'Text': "What's in this image?"}}]}]
+                        chat_history_messages = chat_entity_message["Content"]["Text"]
+                    elif chat_entity_message["type"] == "image_url":
+                        # TODO: imeplement image parser in model_backedn
+                        # This field is expected to be base64 encoded string
+                        IMAGE_BASE64_PREFIX = (
+                            "data:image/jpeg;base64,"  # "{base64_image}"
+                        )
+                        if len(chat_entity_message["Content"]["ImageUrl"]) == 0:
+                            continue
+                        elif (
+                            "promptImageUrl"
+                            in chat_entity_message["Content"]["ImageUrl"]["image_url"][
+                                "Type"
+                            ]
+                        ):
+                            image = Image.open(
+                                io.BytesIO(
+                                    requests.get(
+                                        chat_entity_message["Content"]["ImageUrl"][
+                                            "image_url"
+                                        ]["Type"]["promptImageUrl"]
+                                    ).content
+                                )
+                            )
+                            chat_hisotry_images.append(image)
+                        elif (
+                            "promptImageBase64"
+                            in chat_entity_message["Content"]["ImageUrl"]["image_url"][
+                                "Type"
+                            ]
+                        ):
+                            image_base64_str = chat_entity_message["Content"][
+                                "ImageUrl"
+                            ]["image_url"]["Type"]["promptImageBase64"]
+                            if image_base64_str.startswith(IMAGE_BASE64_PREFIX):
+                                image_base64_str = image_base64_str[
+                                    IMAGE_BASE64_PREFIX:
+                                ]
+                            # expected content in url with base64 format:
+                            # f"data:image/jpeg;base64,{base64_image}"
+                            pil_img = Image.open(
+                                io.BytesIO(base64.b64decode(image_base64_str))
+                            )
+                            image = np.array(pil_img)
+                            if len(image.shape) == 2:  # gray image
+                                raise ValueError(
+                                    f"The chat history image shape with {image.shape} is "
+                                    f"not in acceptable"
+                                )
+                            chat_hisotry_images.append(image)
+                    else:
+                        raise ValueError(
+                            "Unsupported chat_hisotry message type"
+                            ", expected eithjer 'text' or 'image_url'"
+                            f" but get {chat_entity_message['type']}"
+                        )
+
+                # TODO: support image message in chat history
+                # self.messages.append([role, message])
+                if role not in prompt_roles:
+                    raise ValueError(
+                        f"Role `{chat_entity['role']}` is not in supported"
+                        f"role list ({','.join(prompt_roles)})"
+                    )
+                elif role == prompt_roles[-1] and default_system_message is not None:
+                    raise ValueError(
+                        "it's ambiguious to set `system_message` and "
+                        f"using role `{prompt_roles[-1]}` simultaneously"
+                    )
+                elif chat_history_messages is None:
+                    raise ValueError(
+                        f"No message found in chat_history. {chat_entity_message}"
+                    )
+                if role == prompt_roles[-1]:
+                    default_system_message = chat_history_messages
+                else:
+                    prompt_conversation.append([role, chat_history_messages])
+
+            if default_system_message is None:
+                default_system_message = (
+                    "You are a helpful, respectful and honest assistant. "
+                    "Always answer as helpfully as possible, while being safe.  "
+                    "Your answers should not include any harmful, unethical, racist, "
+                    "sexist, toxic, dangerous, or illegal content. Please ensure that "
+                    "your responses are socially unbiased and positive in nature. "
+                    "If a question does not make any sense, or is not factually coherent, "
+                    "explain why instead of answering something not correct. If you don't "
+                    "know the answer to a question, please don't share false information."
+                )
+            conv = Conversation(
+                system=default_system_message,
+                roles=tuple(prompt_roles[:-1]),
+                version="llama_v2",
+                messages=prompt_conversation,
+                offset=0,
+                sep_style=SeparatorStyle.LLAMA_2,
+                sep="<s>",
+                sep2="</s>",
+            )
+            conv.append_message(conv.roles[0], task_text_generation_chat_input.prompt)
+        else:
+            if task_text_generation_chat_input.system_message is not None:
+                conv = Conversation(
+                    system=task_text_generation_chat_input.system_message,
+                    roles=tuple(prompt_roles[:-1]),
+                    version="llama_v2",
+                    messages=[],
+                    offset=0,
+                    sep_style=SeparatorStyle.LLAMA_2,
+                    sep="<s>",
+                    sep2="</s>",
+                )
+            else:
+                conv = conv_templates["llama_2"].copy()
+            conv.append_message(conv.roles[0], task_text_generation_chat_input.prompt)
+
+        print("----------------")
+        print(f"[DEBUG] Conversation Prompt: \n{conv.get_prompt()}")
+        print("----------------")
+
+        # if not prompt_in_conversation:
+        # conv = conv_templates["llama_2"].copy()
+        # conv.append_message(conv.roles[0], task_text_generation_chat_input.prompt)
+
+        # End of Process chat_history
         sampling_params = SamplingParams(
             temperature=task_text_generation_chat_input.temperature,
             max_tokens=task_text_generation_chat_input.max_new_tokens,
-            top_k=task_text_generation_chat_input.top_k
-            # **extra_params,
+            top_k=task_text_generation_chat_input.top_k,
+            **task_text_generation_chat_input.extra_params,
         )
 
+        t0 = time.time()
         vllm_outputs = self.llm_engine.generate(conv.get_prompt(), sampling_params)
+        print(f"Inference time cost {time.time()-t0}s")
 
         sequences = []
         for vllm_output in vllm_outputs:
