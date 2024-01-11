@@ -11,22 +11,6 @@ from typing import (
 
 DESCRIPTOR: _descriptor.FileDescriptor
 
-class ModelReadyRequest(_message.Message):
-    __slots__ = ["name", "version"]
-    NAME_FIELD_NUMBER: _ClassVar[int]
-    VERSION_FIELD_NUMBER: _ClassVar[int]
-    name: str
-    version: str
-    def __init__(
-        self, name: _Optional[str] = ..., version: _Optional[str] = ...
-    ) -> None: ...
-
-class ModelReadyResponse(_message.Message):
-    __slots__ = ["ready"]
-    READY_FIELD_NUMBER: _ClassVar[int]
-    ready: bool
-    def __init__(self, ready: bool = ...) -> None: ...
-
 class ModelMetadataRequest(_message.Message):
     __slots__ = ["name", "version"]
     NAME_FIELD_NUMBER: _ClassVar[int]
@@ -96,7 +80,7 @@ class ModelMetadataResponse(_message.Message):
         ] = ...,
     ) -> None: ...
 
-class ModelInferRequest(_message.Message):
+class RayServiceCallRequest(_message.Message):
     __slots__ = [
         "model_name",
         "model_version",
@@ -119,7 +103,7 @@ class ModelInferRequest(_message.Message):
     model_version: str
     inputs: _containers.RepeatedCompositeFieldContainer[InferTensor]
     outputs: _containers.RepeatedCompositeFieldContainer[
-        ModelInferRequest.InferRequestedOutputTensor
+        RayServiceCallRequest.InferRequestedOutputTensor
     ]
     raw_input_contents: _containers.RepeatedScalarFieldContainer[bytes]
     def __init__(
@@ -128,12 +112,14 @@ class ModelInferRequest(_message.Message):
         model_version: _Optional[str] = ...,
         inputs: _Optional[_Iterable[_Union[InferTensor, _Mapping]]] = ...,
         outputs: _Optional[
-            _Iterable[_Union[ModelInferRequest.InferRequestedOutputTensor, _Mapping]]
+            _Iterable[
+                _Union[RayServiceCallRequest.InferRequestedOutputTensor, _Mapping]
+            ]
         ] = ...,
         raw_input_contents: _Optional[_Iterable[bytes]] = ...,
     ) -> None: ...
 
-class ModelInferResponse(_message.Message):
+class RayServiceCallResponse(_message.Message):
     __slots__ = ["model_name", "model_version", "outputs", "raw_output_contents"]
     MODEL_NAME_FIELD_NUMBER: _ClassVar[int]
     MODEL_VERSION_FIELD_NUMBER: _ClassVar[int]
