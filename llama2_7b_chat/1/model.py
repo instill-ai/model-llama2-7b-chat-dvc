@@ -40,6 +40,7 @@ class Llama2Chat:
             model=model_path,
             torch_dtype=torch.float16,
             device_map="auto",
+            prefer_safe=True,
         )
 
     def ModelMetadata(self, req):
