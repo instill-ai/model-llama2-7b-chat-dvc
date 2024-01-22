@@ -1,3 +1,12 @@
+# pylint: skip-file
+import os
+
+TORCH_GPU_MEMORY_FRACTION = 0.95  # Target memory ~= 15G on 16G card
+# TORCH_GPU_MEMORY_FRACTION = 0.38  # Target memory ~= 15G on 40G card
+TORCH_GPU_DEVICE_ID = 0
+os.environ["CUDA_VISIBLE_DEVICES"] = f"{TORCH_GPU_DEVICE_ID}"
+
+
 import io
 import time
 import requests
@@ -29,11 +38,20 @@ from instill.helpers import (
 from conversation import Conversation, conv_templates, SeparatorStyle
 
 
+torch.cuda.set_per_process_memory_fraction(
+    TORCH_GPU_MEMORY_FRACTION, 0  # it count of number of device instead of device index
+)
+
+
 @instill_deployment
 class Llama2Chat:
     def __init__(self, model_path: str):
         self.application_name = "_".join(model_path.split("/")[3:5])
         self.deployement_name = model_path.split("/")[4]
+        print(f"application_name: {self.application_name}")
+        print(f"deployement_name: {self.deployement_name}")
+        print(f"torch version: {torch.__version__}")
+
         self.tokenizer = LlamaTokenizer.from_pretrained(model_path)
         self.pipeline = transformers.pipeline(
             "text-generation",
