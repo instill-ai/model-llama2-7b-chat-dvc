@@ -353,7 +353,8 @@ class Llama2Chat:
 
         print(f"Inference time cost {time.time()-t0}s")
 
-        text_outputs = [seq["generated_text"].encode("utf-8") for seq in sequences]
+        # text_outputs = [seq["generated_text"].encode("utf-8") for seq in sequences]
+        text_outputs = [seq["output"].encode("utf-8") for seq in sequences]
         task_output = serialize_byte_tensor(np.asarray(text_outputs))
         # task_output = StandardTaskIO.parse_task_text_generation_output(sequences)
 
