@@ -38,9 +38,9 @@ from instill.helpers import (
 from conversation import Conversation, conv_templates, SeparatorStyle
 
 
-torch.cuda.set_per_process_memory_fraction(
-    TORCH_GPU_MEMORY_FRACTION, 0  # it count of number of device instead of device index
-)
+# torch.cuda.set_per_process_memory_fraction(
+#     TORCH_GPU_MEMORY_FRACTION, 0  # it count of number of device instead of device index
+# )
 
 
 @instill_deployment
