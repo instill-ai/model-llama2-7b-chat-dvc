@@ -1,7 +1,7 @@
 # pylint: skip-file
 import os
 
-TORCH_GPU_MEMORY_FRACTION = 0.95  # Target memory ~= 15G on 16G card
+# TORCH_GPU_MEMORY_FRACTION = 0.95  # Target memory ~= 15G on 16G card
 # TORCH_GPU_MEMORY_FRACTION = 0.38  # Target memory ~= 15G on 40G card
 TORCH_GPU_DEVICE_ID = 0
 os.environ["CUDA_VISIBLE_DEVICES"] = f"{TORCH_GPU_DEVICE_ID}"
@@ -51,6 +51,12 @@ class Llama2Chat:
         print(f"application_name: {self.application_name}")
         print(f"deployement_name: {self.deployement_name}")
         print(f"torch version: {torch.__version__}")
+
+        print(f"torch.cuda.is_available() : {torch.cuda.is_available()}")
+        print(f"torch.cuda.device_count() : {torch.cuda.device_count()}")
+        print(f"torch.cuda.current_device() : {torch.cuda.current_device()}")
+        print(f"torch.cuda.device(0) : {torch.cuda.device(0)}")
+        print(f"torch.cuda.get_device_name(0) : {torch.cuda.get_device_name(0)}")
 
         self.tokenizer = LlamaTokenizer.from_pretrained(model_path)
         self.pipeline = transformers.pipeline(
