@@ -353,15 +353,13 @@ class Llama2Chat:
 
         print(f"Inference time cost {time.time()-t0}s")
 
-        # text_outputs = [
-        #     seq["generated_text"].encode("utf-8")
-        #     for seq in sequences
-        # ]
-        # task_output = serialize_byte_tensor(np.asarray(text_outputs))
-        task_outputs = [StandardTaskIO.parse_task_text_generation_output(sequences)]
+        text_outputs = [seq["generated_text"].encode("utf-8") for seq in sequences]
+        task_output = serialize_byte_tensor(np.asarray(text_outputs))
+        # task_output = StandardTaskIO.parse_task_text_generation_output(sequences)
 
         print("Output:")
-        print(task_outputs)
+        print(task_output)
+        print(type(task_output))
 
         return construct_infer_response(
             req=req,
@@ -372,7 +370,7 @@ class Llama2Chat:
                     shape=[-1, -1],
                 )
             ],
-            raw_outputs=task_outputs,
+            raw_outputs=[task_output],
         )
 
 
