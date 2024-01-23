@@ -64,7 +64,7 @@ class Llama2Chat:
             model=model_path,
             torch_dtype=torch.float16,
             device_map="auto",
-            prefer_safe=True,
+            # prefer_safe=True,
         )
 
     def ModelMetadata(self, req):
@@ -150,6 +150,9 @@ class Llama2Chat:
 
         print("print(task_text_generation_chat.system_message")
         print(task_text_generation_chat_input.system_message)
+        if len(task_text_generation_chat_input.system_message) is not None:
+            if len(task_text_generation_chat_input.system_message) == 0:
+                task_text_generation_chat_input.system_message = None
         print("-------\n")
 
         print("print(task_text_generation_chat.max_new_tokens")
@@ -269,7 +272,11 @@ class Llama2Chat:
                         f"Role `{chat_entity['role']}` is not in supported"
                         f"role list ({','.join(prompt_roles)})"
                     )
-                elif role == prompt_roles[-1] and default_system_message is not None:
+                elif (
+                    role == prompt_roles[-1]
+                    and default_system_message is not None
+                    and len(default_system_message) > 0
+                ):
                     raise ValueError(
                         "it's ambiguious to set `system_message` and "
                         f"using role `{prompt_roles[-1]}` simultaneously"
