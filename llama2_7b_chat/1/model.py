@@ -365,7 +365,7 @@ class Llama2Chat:
             req=req,
             outputs=[
                 Metadata(
-                    name="generated_text",
+                    name="text",
                     datatype=str(DataType.TYPE_STRING.name),
                     shape=[-1, -1],
                 )
