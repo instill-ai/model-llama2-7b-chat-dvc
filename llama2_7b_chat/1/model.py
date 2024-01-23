@@ -210,14 +210,37 @@ class Llama2Chat:
                                 "Multiple text message detected"
                                 " in a single chat history entity"
                             )
+                        # This structure comes from google protobuf `One of` Syntax, where an additional layer in Content
                         # [{'role': 'system', 'content': [{'type': 'text', 'Content': {'Text': "What's in this image?"}}]}]
-                        chat_history_messages = chat_entity_message["Content"]["Text"]
+                        if "Content" in chat_entity_message:
+                            chat_history_messages = chat_entity_message["Content"][
+                                "Text"
+                            ]
+                        elif "Text" in chat_entity_message:
+                            chat_history_messages = chat_entity_message["Text"]
+                        elif "text" in chat_entity_message:
+                            chat_history_messages = chat_entity_message["text"]
+                        else:
+                            raise ValueError(
+                                f"Unknown structure of chat_hisoty: {task_text_generation_chat_input.chat_history}"
+                            )
                     elif chat_entity_message["type"] == "image_url":
                         # TODO: imeplement image parser in model_backedn
                         # This field is expected to be base64 encoded string
                         IMAGE_BASE64_PREFIX = (
                             "data:image/jpeg;base64,"  # "{base64_image}"
                         )
+                        # This structure comes from google protobuf `One of` Syntax, where an additional layer in Content
+                        # TODO: Handling this field
+                        if (
+                            "Content" not in chat_entity_message
+                            or "ImageUrl" not in chat_entity_message["Content"]
+                        ):
+                            print(
+                                f"Unsupport chat_entity_message format: {chat_entity_message}"
+                            )
+                            continue
+
                         if len(chat_entity_message["Content"]["ImageUrl"]) == 0:
                             continue
                         elif (
