@@ -188,6 +188,9 @@ class Llama2Chat:
 
         # Process chat_history
         # Preprocessing
+
+        CHECK_FIRST_ROLE_IS_USER = True
+        COMBINED_CONSEQUENCE_PROMPTS = True
         prompt_roles = ["USER", "ASSISTANT", "SYSTEM"]
         if (
             task_text_generation_chat_input.chat_history is not None
@@ -288,6 +291,18 @@ class Llama2Chat:
                 if role == prompt_roles[-1]:
                     default_system_message = chat_history_messages
                 else:
+                    if CHECK_FIRST_ROLE_IS_USER:
+                        if len(prompt_conversation) == 0 and role != prompt_roles[0]:
+                            prompt_conversation.append([prompt_roles[0], " "])
+                    if COMBINED_CONSEQUENCE_PROMPTS:
+                        if (
+                            len(prompt_conversation) > 0
+                            and prompt_conversation[-1][0] == role
+                        ):
+                            laset_conversation = prompt_conversation.pop()
+                            chat_history_messages = (
+                                f"{laset_conversation[1]}\n\n{chat_history_messages}"
+                            )
                     prompt_conversation.append([role, chat_history_messages])
 
             if default_system_message is None:
@@ -301,6 +316,18 @@ class Llama2Chat:
                     "explain why instead of answering something not correct. If you don't "
                     "know the answer to a question, please don't share false information."
                 )
+
+            conversation_prompt = task_text_generation_chat_input.prompt
+            if COMBINED_CONSEQUENCE_PROMPTS:
+                if (
+                    len(prompt_conversation) > 0
+                    and prompt_conversation[-1][0] == prompt_roles[0]
+                ):
+                    laset_conversation = prompt_conversation.pop()
+                    conversation_prompt = (
+                        f"{laset_conversation[1]}\n\n{conversation_prompt}"
+                    )
+
             conv = Conversation(
                 system=default_system_message,
                 roles=tuple(prompt_roles[:-1]),
@@ -311,7 +338,7 @@ class Llama2Chat:
                 sep="<s>",
                 sep2="</s>",
             )
-            conv.append_message(conv.roles[0], task_text_generation_chat_input.prompt)
+            conv.append_message(conv.roles[0], conversation_prompt)
         else:
             if task_text_generation_chat_input.system_message is not None:
                 conv = Conversation(
