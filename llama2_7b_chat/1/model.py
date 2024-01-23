@@ -357,8 +357,13 @@ class Llama2Chat:
 
         text_outputs = []
         for seq in sequences:
-            generated_text = seq["generated_text"][len(conv.get_prompt()) :].encode(
-                "utf-8"
+            print("Output No Clean ----")
+            print(seq["generated_text"])
+            print("Output Clean ----")
+            print(seq["generated_text"][len(conv.get_prompt()) :])
+            print("---")
+            generated_text = (
+                seq["generated_text"][len(conv.get_prompt()) :].strip().encode("utf-8")
             )
             text_outputs.append(generated_text)
             max_output_len = max(max_output_len, len(generated_text))
