@@ -353,8 +353,12 @@ class Llama2Chat:
 
         print(f"Inference time cost {time.time()-t0}s")
 
-        sequences_generated_texts = [seq["generated_text"] for seq in sequences]
+        sequences_generated_texts = [
+            seq["generated_text"].encode("utf-8") for seq in sequences
+        ]
 
+        print("Output:")
+        print(sequences_generated_texts)
         return construct_infer_response(
             req=req,
             outputs=[
