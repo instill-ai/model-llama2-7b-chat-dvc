@@ -12,7 +12,6 @@ import time
 import requests
 import random
 import base64
-import ray
 import torch
 import transformers
 from transformers import LlamaForCausalLM, LlamaTokenizer
@@ -38,11 +37,6 @@ from instill.helpers import (
 from conversation import Conversation, conv_templates, SeparatorStyle
 
 
-# torch.cuda.set_per_process_memory_fraction(
-#     TORCH_GPU_MEMORY_FRACTION, 0  # it count of number of device instead of device index
-# )
-
-
 @instill_deployment
 class Llama2Chat:
     def __init__(self, model_path: str):
@@ -54,16 +48,25 @@ class Llama2Chat:
 
         print(f"torch.cuda.is_available() : {torch.cuda.is_available()}")
         print(f"torch.cuda.device_count() : {torch.cuda.device_count()}")
-        print(f"torch.cuda.current_device() : {torch.cuda.current_device()}")
-        print(f"torch.cuda.device(0) : {torch.cuda.device(0)}")
-        print(f"torch.cuda.get_device_name(0) : {torch.cuda.get_device_name(0)}")
+        # print(f"torch.cuda.current_device() : {torch.cuda.current_device()}")
+        # print(f"torch.cuda.device(0) : {torch.cuda.device(0)}")
+        # print(f"torch.cuda.get_device_name(0) : {torch.cuda.get_device_name(0)}")
 
-        self.tokenizer = LlamaTokenizer.from_pretrained(model_path)
+        # https://huggingface.co/meta-llama/Llama-2-7b-chat-hf
+        # Download through huggingface
+
+        ACCESS_TOKEN = "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"
+
+        self.tokenizer = LlamaTokenizer.from_pretrained(
+            "meta-llama/Llama-2-7b-chat-hf",
+            token=ACCESS_TOKEN,
+        )
         self.pipeline = transformers.pipeline(
             "text-generation",
-            model=model_path,
+            model="meta-llama/Llama-2-7b-chat-hf",
             torch_dtype=torch.float16,
             device_map="auto",
+            token=ACCESS_TOKEN,
             # prefer_safe=True,
         )
 
@@ -438,10 +441,11 @@ class Llama2Chat:
         )
 
 
-deployable = InstillDeployable(
-    Llama2Chat, model_weight_or_folder_name="Llama-2-7b-chat-hf/", use_gpu=True
+entrypoint = (
+    # https://github.com/instill-ai/python-sdk/blob/main/samples/tinyllama-gpu/model.py
+    InstillDeployable(Llama2Chat)
+    .update_max_replicas(4)
+    .update_min_replicas(1)
+    .update_num_gpus(0.375)  # 15G/40G
+    .get_deployment_handle()
 )
-
-# # Optional
-# deployable.update_max_replicas(2)
-# deployable.update_min_replicas(0)

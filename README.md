@@ -16,6 +16,24 @@ Notes:
 - Disk Space Requirements: 13G
 - GPU Memory Requirements: 14G
 
+**Create Model**
+
+```json
+{
+    "id": "llama2-7b-chat-gpu",
+    "description": "Llama2-7b-Chat, from meta, is trained to generate text based on your prompts.",
+    "model_definition": "model-definitions/container",
+    "visibility": "VISIBILITY_PUBLIC",
+    "region": "REGION_GCP_EUROPE_WEST_4",
+    "hardware": "GPU",
+    "configuration": {
+        "task": "TEXT_GENERATION_CHAT"
+    }
+}
+```
+
+**Inference model**
+
 ```
 {
     "task_inputs": [
